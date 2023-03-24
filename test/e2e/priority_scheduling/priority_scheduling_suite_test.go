@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/apache/yunikorn-k8shim/test/e2e/framework/configmanager"
+	"github.com/apache/yunikorn-k8shim/test/e2e/framework/helpers/common"
 	"github.com/apache/yunikorn-k8shim/test/e2e/framework/helpers/k8s"
 	"github.com/apache/yunikorn-k8shim/test/e2e/framework/helpers/yunikorn"
 )
@@ -73,12 +74,17 @@ var normalPriorityClass = schedulingv1.PriorityClass{
 	PreemptionPolicy: &preemptPolicyNever,
 }
 
+var annotation = "ann-" + common.RandSeq(10)
+var oldConfigMap = new(v1.ConfigMap)
+
 var _ = ginkgo.BeforeSuite(func() {
 	var err error
 	kubeClient = k8s.KubeCtl{}
 	Expect(kubeClient.SetClient()).To(BeNil())
 
+	var annotation = "ann-" + common.RandSeq(10)
 	yunikorn.EnsureYuniKornConfigsPresent()
+	yunikorn.UpdateConfigMapWrapper(oldConfigMap, "", annotation)
 
 	By(fmt.Sprintf("Creating priority class %s", lowPriorityClass.Name))
 	_, err = kubeClient.CreatePriorityClass(&lowPriorityClass)
@@ -97,6 +103,8 @@ var _ = ginkgo.AfterSuite(func() {
 	var err error
 	kubeClient = k8s.KubeCtl{}
 	Expect(kubeClient.SetClient()).To(BeNil())
+
+	yunikorn.RestoreConfigMapWrapper(oldConfigMap, annotation)
 
 	By(fmt.Sprintf("Removing priority class %s", normalPriorityClass.Name))
 	err = kubeClient.DeletePriorityClass(normalPriorityClass.Name)
