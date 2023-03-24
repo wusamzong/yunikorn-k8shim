@@ -27,7 +27,6 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 
-	"github.com/apache/yunikorn-k8shim/test/e2e/framework/configmanager"
 	"github.com/apache/yunikorn-k8shim/test/e2e/framework/helpers/common"
 	"github.com/apache/yunikorn-k8shim/test/e2e/framework/helpers/k8s"
 	"github.com/apache/yunikorn-k8shim/test/e2e/framework/helpers/yunikorn"
@@ -46,9 +45,10 @@ const (
 var _ = ginkgo.Describe("", func() {
 	var kClient k8s.KubeCtl
 	var restClient yunikorn.RClient
-	var oldConfigMap *v1.ConfigMap
 	var sleepRespPod *v1.Pod
 	var dev = "dev" + common.RandSeq(5)
+	var oldConfigMap = new(v1.ConfigMap)
+	var annotation = "ann-" + common.RandSeq(10)
 
 	// Define sleepPod
 	sleepPodConfigs := k8s.SleepPodConfig{Name: "sleepjob", NS: dev}
@@ -62,25 +62,7 @@ var _ = ginkgo.Describe("", func() {
 		restClient = yunikorn.RClient{}
 
 		yunikorn.EnsureYuniKornConfigsPresent()
-
-		ginkgo.By("Enable basic scheduling config over config maps")
-		var c, err = kClient.GetConfigMaps(configmanager.YuniKornTestConfig.YkNamespace,
-			configmanager.DefaultYuniKornConfigMap)
-		Ω(err).NotTo(gomega.HaveOccurred())
-		Ω(c).NotTo(gomega.BeNil())
-
-		oldConfigMap = c.DeepCopy()
-		Ω(c).Should(gomega.BeEquivalentTo(oldConfigMap))
-
-		// Define basic configMap
-		sc := common.CreateBasicConfigMap()
-		configStr, yamlErr := common.ToYAML(sc)
-		Ω(yamlErr).NotTo(gomega.HaveOccurred())
-
-		c.Data[configmanager.DefaultPolicyGroup] = configStr
-		var d, err3 = kClient.UpdateConfigMap(c, configmanager.YuniKornTestConfig.YkNamespace)
-		Ω(err3).NotTo(gomega.HaveOccurred())
-		Ω(d).NotTo(gomega.BeNil())
+		yunikorn.UpdateConfigMapWrapper(oldConfigMap, "", annotation)
 
 		ginkgo.By("create development namespace")
 		ns1, err := kClient.CreateNamespace(dev, nil)
@@ -297,14 +279,6 @@ var _ = ginkgo.Describe("", func() {
 		err = kClient.TearDownNamespace(dev)
 		Ω(err).NotTo(gomega.HaveOccurred())
 
-		ginkgo.By("Restoring the old config maps")
-		var c, err1 = kClient.GetConfigMaps(configmanager.YuniKornTestConfig.YkNamespace,
-			configmanager.DefaultYuniKornConfigMap)
-		Ω(err1).NotTo(gomega.HaveOccurred())
-		Ω(c).NotTo(gomega.BeNil())
-		c.Data = oldConfigMap.Data
-		var e, err3 = kClient.UpdateConfigMap(c, configmanager.YuniKornTestConfig.YkNamespace)
-		Ω(err3).NotTo(gomega.HaveOccurred())
-		Ω(e).NotTo(gomega.BeNil())
+		yunikorn.RestoreConfigMapWrapper(oldConfigMap, annotation)
 	})
 })
